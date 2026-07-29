@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📅 时段预约排班表</title>
+    <style>
+        :root {
+            --bg: #fdf8f3;
+            --card-bg: #ffffff;
+            --primary: #8b5e3c;
+            --primary-light: #c49a6c;
+            --accent: #d4a574;
+            --text: #3e2f22;
+            --text-light: #6b5d4f;
+            --border: #e0d5c7;
+            --free-bg: #f0faf5;
+            --free-border: #8cc9a8;
+            --free-text: #3d7a5c;
+            --booked-bg: #fff5f0;
+            --booked-border: #e8b89d;
+            --booked-text: #c0784a;
+            --expired-bg: #f5f5f5;
+            --expired-border: #d5d5d5;
+            --expired-text: #b0b0b0;
+            --shadow-sm: 0 1px 3px rgba(62, 47, 34, 0.06);
+            --shadow-md: 0 4px 16px rgba(62, 47, 34, 0.1);
+            --shadow-lg: 0 12px 32px rgba(62, 47, 34, 0.15);
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, sans-serif;
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse at 20% 20%, rgba(196, 154, 108, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 70%, rgba(139, 94, 60, 0.04) 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 50%, rgba(212, 167, 116, 0.03) 0%, transparent 70%);
+            min-height: 100vh;
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 16px 40px;
+            line-height: 1.6;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* ========== 主容器 ========== */
+        .main-container {
+            width: 100%;
+            max-width: 960px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* ========== 头部 ========== */
+        .header {
+            text-align: center;
+            padding: 10px 0 6px;
+        }
+        .header .icon-row {
+            font-size: 40px;
+            margin-bottom: 6px;
+            letter-spacing: 4px;
+        }
+        .header h1 {
+            font-size: clamp(1.5rem, 3vw, 1.85rem);
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: 0.03em;
+            margin: 0;
+        }
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-top: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        /* ========== 说明卡片 ========== */
+        .notice-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.92rem;
+            color: var(--text-light);
+            line-height: 1.7;
+            letter-spacing: 0.02em;
+        }
+        .notice-card .notice-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .notice-card strong {
+            color: var(--primary);
+        }
+
+        /* ========== 周次导航 ========== */
+        .week-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .week-nav button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1.5px solid var(--border);
+            background: var(--card-bg);
+            cursor: pointer;
+            font-size: 1.1rem;
+            color: var(--text);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-sm);
+        }
+        .week-nav button:hover {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: scale(1.04);
+        }
+        .week-nav button:active {
+            transform: scale(0.95);
+            transition: 0.08s;
+        }
+        .week-nav .week-label {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--primary);
+            min-width: 180px;
+            text-align: center;
+            letter-spacing: 0.03em;
+            background: var(--card-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .week-nav .today-btn {
+            border-radius: 20px;
+            width: auto;
+            padding: 0 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            gap: 4px;
+        }
+
+        /* ========== 时间表格容器 ========== */
+        .table-wrapper {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px 16px 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-wrapper h2 {
+            text-align: center;
+            font-size: 1.15rem;
+            color: var(--primary);
+            margin-bottom: 16px;
+            letter-spacing: 0.04em;
+            font-weight: 700;
+        }
+
+        /* ========== 表格 ========== */
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 700px;
+            table-layout: fixed;
+        }
+        .schedule-table th,
+        .schedule-table td {
+            text-align: center;
+            vertical-align: middle;
+            padding: 10px 6px;
+            font-size: 0.88rem;
+            letter-spacing: 0.02em;
+        }
+        .schedule-table thead th {
+            background: #faf7f2;
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 12px 6px;
+            border-bottom: 2px solid var(--accent);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            letter-spacing: 0.04em;
+        }
+        .schedule-table thead th .date-num {
+            display: block;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1.2;
+        }
+        .schedule-table thead th .date-month {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+        .schedule-table thead th.today-col {
+            background: #fffdf7;
+            box-shadow: inset 0 -3px 0 var(--accent);
+        }
+        .schedule-table thead th.today-col .date-num {
+            color: #c07830;
+        }
+
+        /* 时段标签列 */
+        .schedule-table .time-label {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            background: #fdfaf6;
+            border-right: 1px solid var(--border);
+            width: 70px;
+            min-width: 70px;
+        }
+        .schedule-table .time-label .time-range {
+            display: block;
+            font-weight: 400;
+            font-size: 0.72rem;
+            color: var(--text-light);
+            letter-spacing: 0.02em;
+        }
+
+        /* 可预约单元格 */
+        .schedule-table td.slot-cell {
+            cursor: pointer;
+            border-radius: 8px;
+            transition: var(--transition);
+            position: relative;
+            font-weight: 600;
+            font-size: 0.82rem;
+            letter-spacing: 0.03em;
+            border: 2px solid transparent;
+            min-height: 56px;
+        }
+        .schedule-table td.slot-cell.free {
+            background: var(--free-bg);
+            border-color: var(--free-border);
+            color: var(--free-text);
+            cursor: pointer;
+        }
+        .schedule-table td.slot-cell.free:hover {
+            background: #d9f3e4;
+            border-color: #5fae82;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(100, 180, 140, 0.2);
+            z-index: 3;
+        }
+        .schedule-table td.slot-cell.free:active {
+            transform: scale(0.96);
+            transition: 0.08s;
+        }
+        .schedule-table td.slot-cell.free .slot-status {
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        .schedule-table td.slot-cell.free .slot-icon {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+        }
+
+        /* 已预约单元格 */
+        .schedule-table td.slot-cell.booked {
+            background: var(--booked-bg);
+            border-color: var(--booked-border);
+            color: var(--booked-text);
+            cursor: default;
+            pointer-events: auto;
+        }
+        .schedule-table td.slot-cell.booked .slot-icon {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+        }
+        .schedule-table td.slot-cell.booked .slot-status {
+            font-weight: 700;
+            font-size: 0.78rem;
+        }
+
+        /* 已过期单元格 */
+        .schedule-table td.slot-cell.expired {
+            background: var(--expired-bg);
+            border-color: var(--expired-border);
+            color: var(--expired-text);
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .schedule-table td.slot-cell.expired .slot-icon {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+            opacity: 0.5;
+        }
+        .schedule-table td.slot-cell.expired .slot-status {
+            font-size: 0.78rem;
+        }
+
+        /* 响应式：小屏幕表格可横滚 */
+        @media (max-width: 768px) {
+            .table-wrapper {
+                padding: 12px 8px 16px;
+                border-radius: var(--radius-md);
+            }
+            .schedule-table th,
+            .schedule-table td {
+                padding: 8px 4px;
+                font-size: 0.76rem;
+            }
+            .schedule-table thead th .date-num {
+                font-size: 1.05rem;
+            }
+            .schedule-table .time-label {
+                font-size: 0.78rem;
+                width: 55px;
+                min-width: 55px;
+            }
+            .schedule-table td.slot-cell {
+                font-size: 0.7rem;
+                min-height: 44px;
+            }
+            .schedule-table td.slot-cell .slot-icon {
+                font-size: 1rem;
+            }
+            .schedule-table td.slot-cell .slot-status {
+                font-size: 0.68rem;
+            }
+        }
+
+        /* ========== 图例 ========== */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 6px;
+            font-size: 0.82rem;
+            color: var(--text-light);
+            letter-spacing: 0.02em;
+        }
+        .legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend .dot {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 2px solid;
+        }
+        .legend .dot.free-dot {
+            background: var(--free-bg);
+            border-color: var(--free-border);
+        }
+        .legend .dot.booked-dot {
+            background: var(--booked-bg);
+            border-color: var(--booked-border);
+        }
+        .legend .dot.expired-dot {
+            background: var(--expired-bg);
+            border-color: var(--expired-border);
+        }
+
+        /* ========== 管理按钮 ========== */
+        .admin-trigger-area {
+            display: flex;
+            justify-content: center;
+            margin-top: 4px;
+        }
+        .btn-admin-trigger {
+            background: transparent;
+            border: 1.5px dashed var(--border);
+            color: var(--text-light);
+            padding: 10px 22px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .btn-admin-trigger:hover {
+            border-color: var(--primary-light);
+            color: var(--primary);
+            background: #fdfaf6;
+            box-shadow: var(--shadow-sm);
+        }
+        .btn-admin-trigger .lock-icon {
+            margin-right: 4px;
+        }
+
+        /* ========== 模态框遮罩 ========== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(40, 25, 15, 0.55);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.25s ease;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* ========== 模态框卡片 ========== */
+        .modal-card {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            padding: 28px 26px 24px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+        .modal-card h3 {
+            font-size: 1.25rem;
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 6px;
+            letter-spacing: 0.04em;
+        }
+        .modal-card .selected-slot-info {
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--accent);
+            background: #fdfaf6;
+            padding: 8px 14px;
+            border-radius: 20px;
+            margin-bottom: 18px;
+            letter-spacing: 0.03em;
+            border: 1px solid var(--border);
+        }
+        .modal-card .form-group {
+            margin-bottom: 15px;
+        }
+        .modal-card label {
+            display: block;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text);
+            margin-bottom: 4px;
+            letter-spacing: 0.03em;
+        }
+        .modal-card label .required-star {
+            color: #e07050;
+            margin-left: 2px;
+        }
+        .modal-card input[type="text"],
+        .modal-card input[type="date"],
+        .modal-card input[type="time"],
+        .modal-card select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: var(--text);
+            background: #fefdfb;
+            transition: var(--transition);
+            letter-spacing: 0.02em;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .modal-card input:focus,
+        .modal-card select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(212, 167, 116, 0.12);
+            background: #fff;
+        }
+        .modal-card .radio-group {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            padding: 6px 0;
+        }
+        .modal-card .radio-group label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 0.9rem;
+            letter-spacing: 0.03em;
+        }
+        .modal-card .radio-group input[type="radio"] {
+            accent-color: var(--primary);
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .modal-card .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .modal-card .btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: var(--transition);
+            border: none;
+            font-family: inherit;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(139, 94, 60, 0.3);
+        }
+        .btn-primary:hover {
+            background: #6d4529;
+            box-shadow: 0 6px 20px rgba(139, 94, 60, 0.4);
+            transform: translateY(-1px);
+        }
+        .btn-primary:active {
+            transform: scale(0.96);
+            transition: 0.08s;
+        }
+        .btn-cancel {
+            background: #fff;
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+        .btn-cancel:hover {
+            background: #f5f0ea;
+            border-color: #c0b0a0;
+        }
+
+        /* ========== 管理面板 ========== */
+        .admin-panel {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            padding: 24px 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+            margin-top: 8px;
+            animation: slideUp 0.3s ease;
+        }
+        .admin-panel h3 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 16px;
+            letter-spacing: 0.04em;
+        }
+        .admin-panel .password-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .admin-panel .password-row input {
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            width: 180px;
+            letter-spacing: 0.04em;
+            text-align: center;
+            transition: var(--transition);
+        }
+        .admin-panel .password-row input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(212, 167, 116, 0.1);
+        }
+        .admin-panel .btn-small {
+            padding: 9px 18px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            border: none;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+        .btn-danger {
+            background: #e07050;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c05538;
+            box-shadow: 0 4px 12px rgba(200, 80, 50, 0.3);
+        }
+        .btn-export {
+            background: #5a8a6e;
+            color: #fff;
+        }
+        .btn-export:hover {
+            background: #3d6d50;
+            box-shadow: 0 4px 12px rgba(70, 120, 90, 0.3);
+        }
+        .btn-outline {
+            background: #fff;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        .btn-outline:hover {
+            background: #fdfaf6;
+        }
+        .admin-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+            font-size: 0.82rem;
+            letter-spacing: 0.02em;
+        }
+        .admin-table th,
+        .admin-table td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .admin-table th {
+            background: #faf7f2;
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            position: sticky;
+            top: 0;
+        }
+        .admin-table tr:hover td {
+            background: #fefdfb;
+        }
+        .admin-table .delete-btn {
+            background: #fff;
+            border: 1.5px solid #e8b0a0;
+            color: #c05040;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 14px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            transition: var(--transition);
+        }
+        .admin-table .delete-btn:hover {
+            background: #fef0ed;
+            border-color: #d07060;
+            box-shadow: 0 2px 8px rgba(200, 80, 60, 0.15);
+        }
+
+        /* ========== Toast提示 ========== */
+        .toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.03em;
+            box-shadow: var(--shadow-lg);
+            animation: toastIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+            pointer-events: none;
+            text-align: center;
+            max-width: 90vw;
+        }
+        .toast.success {
+            background: #e8f5e9;
+            color: #2e6b3a;
+            border: 1.5px solid #a5d6a7;
+        }
+        .toast.error {
+            background: #fef0ed;
+            color: #a04030;
+            border: 1.5px solid #efc4b8;
+        }
+        .toast.info {
+            background: #fff8e8;
+            color: #8b6d30;
+            border: 1.5px solid #e8d5a0;
+        }
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* ========== 响应式微调 ========== */
+        @media (max-width: 480px) {
+            .modal-card {
+                padding: 20px 14px 18px;
+                border-radius: var(--radius-md);
+            }
+            .modal-card h3 {
+                font-size: 1.1rem;
+            }
+            .modal-card .btn {
+                font-size: 0.85rem;
+                padding: 10px 14px;
+            }
+            .admin-panel {
+                padding: 16px 10px;
+            }
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            .week-nav .week-label {
+                font-size: 0.85rem;
+                min-width: 140px;
+                padding: 6px 12px;
+            }
+            .week-nav button {
+                width: 34px;
+                height: 34px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- ===== 头部 ===== -->
+        <div class="header">
+            <div class="icon-row">📅✨</div>
+            <h1>时段预约排班表</h1>
+            <p class="subtitle">请选择您方便的时间段进行预约</p>
+        </div>
+
+        <!-- ===== 说明卡片 ===== -->
+        <div class="notice-card">
+            <span class="notice-icon">💡</span>
+            <div>
+                <strong>说明：</strong>您好哇，为了避免出现遗漏和重复排列的问题，我设计了本表单供大家选择时间。<br>
+                每个时段<strong>仅限一人</strong>预约，已占用的时段将显示为"已预约"。您只需点击<strong>绿色空闲时段</strong>即可填写信息完成预约。
+            </div>
+        </div>
+
+        <!-- ===== 周次导航 ===== -->
+        <div class="week-nav">
+            <button id="btnPrevWeek" title="上一周">◀</button>
+            <span class="week-label" id="weekLabel">--</span>
+            <button id="btnNextWeek" title="下一周">▶</button>
+            <button id="btnToday" class="today-btn" title="回到本周">📌 本周</button>
+        </div>
+
+        <!-- ===== 时间表格 ===== -->
+        <div class="table-wrapper">
+            <h2>📋 请点击空闲时段进行预约</h2>
+            <table class="schedule-table" id="scheduleTable">
+                <thead>
+                    <tr id="tableHeaderRow">
+                        <!-- 动态生成 -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 动态生成：上午/下午/晚上 三行 -->
+                </tbody>
+            </table>
+            <div class="legend">
+                <span><span class="dot free-dot"></span> 空闲可预约</span>
+                <span><span class="dot booked-dot"></span> 已被预约</span>
+                <span><span class="dot expired-dot"></span> 已过期</span>
+            </div>
+        </div>
+
+        <!-- ===== 管理入口 ===== -->
+        <div class="admin-trigger-area">
+            <button class="btn-admin-trigger" id="btnAdminTrigger">
+                <span class="lock-icon">🔒</span> 管理员查看 / 导出数据
+            </button>
+        </div>
+
+        <!-- ===== 管理面板（初始隐藏） ===== -->
+        <div class="admin-panel" id="adminPanel" style="display:none;">
+            <h3>🔐 管理员面板</h3>
+            <div class="password-row">
+                <input type="password" id="adminPasswordInput" placeholder="请输入管理密码" maxlength="30">
+                <button class="btn-small btn-outline" id="btnAdminLogin">验证进入</button>
+                <button class="btn-small btn-cancel" id="btnAdminClose" style="border:2px solid var(--border);">关闭面板</button>
+            </div>
+            <div id="adminContent" style="display:none;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;">
+                    <button class="btn-small btn-export" id="btnExportCSV">📥 导出CSV</button>
+                    <button class="btn-small btn-outline" id="btnRefreshAdmin">🔄 刷新数据</button>
+                </div>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table" id="adminTable">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>星期</th>
+                                <th>时段</th>
+                                <th>微信号</th>
+                                <th>出生日期</th>
+                                <th>出生时间</th>
+                                <th>出生地点</th>
+                                <th>线上/线下</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody">
+                            <!-- 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+                <p style="text-align:center;margin-top:10px;color:var(--text-light);font-size:0.8rem;">
+                    共 <strong id="adminTotalCount">0</strong> 条预约记录
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 预约表单模态框（隐藏） ===== -->
+    <div class="modal-overlay" id="modalOverlay" style="display:none;">
+        <div class="modal-card" id="modalCard">
+            <h3>✍️ 填写预约信息</h3>
+            <div class="selected-slot-info" id="selectedSlotInfo">--</div>
+            <form id="bookingForm" autocomplete="off">
+                <div class="form-group">
+                    <label for="wechat">微信号 <span class="required-star">*</span></label>
+                    <input type="text" id="wechat" placeholder="请输入您的微信号" required maxlength="60">
+                </div>
+                <div class="form-group">
+                    <label for="birthDate">出生日期（年月日）<span class="required-star">*</span></label>
+                    <input type="date" id="birthDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="birthTime">出生时间（时刻）<span class="required-star">*</span></label>
+                    <input type="time" id="birthTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="birthPlace">出生地点（精确到市）<span class="required-star">*</span></label>
+                    <input type="text" id="birthPlace" placeholder="例如：广东省广州市" required maxlength="60">
+                </div>
+                <div class="form-group">
+                    <label>线上还是线下 <span class="required-star">*</span></label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="online" value="线上" required> 🌐 线上</label>
+                        <label><input type="radio" name="online" value="线下" required> 🏠 线下</label>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-cancel" id="btnCancelBooking">取消</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitBooking">✅ 确认预约</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== Toast容器 ===== -->
+    <div id="toastContainer"></div>
+
+    <script>
+        (function() {
+            // ==================== 常量与配置 ====================
+            const ADMIN_PASSWORD = 'admin888'; // 管理员密码，可在此修改
+            const STORAGE_KEY_PREFIX = 'schedule_appointment_';
+            const TIME_SLOTS = [
+                { id: 'morning', label: '上午', timeRange: '9:00-12:00', startHour: 9, icon: '☀️' },
+                { id: 'afternoon', label: '下午', timeRange: '15:00-18:00', startHour: 15, icon: '🌤️' },
+                { id: 'evening', label: '晚上', timeRange: '19:00-22:00', startHour: 19, icon: '🌙' },
+            ];
+            const WEEKDAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+            // ==================== 状态 ====================
+            let currentWeekMonday = getMondayOfWeek(new Date()); // 当前显示的周的周一日期
+            let selectedSlotKey = null; // 当前选中的时段key: "YYYY-MM-DD|slotId"
+            let isAdminLoggedIn = false;
+
+            // ==================== DOM引用缓存 ====================
+            const $ = (sel) => document.querySelector(sel);
+            const $$ = (sel) => document.querySelectorAll(sel);
+
+            const domScheduleTable = $('#scheduleTable');
+            const domTableHeaderRow = $('#tableHeaderRow');
+            const domWeekLabel = $('#weekLabel');
+            const domModalOverlay = $('#modalOverlay');
+            const domSelectedSlotInfo = $('#selectedSlotInfo');
+            const domBookingForm = $('#bookingForm');
+            const domAdminPanel = $('#adminPanel');
+            const domAdminContent = $('#adminContent');
+            const domAdminPasswordInput = $('#adminPasswordInput');
+            const domAdminTableBody = $('#adminTableBody');
+            const domAdminTotalCount = $('#adminTotalCount');
+            const domToastContainer = $('#toastContainer');
+            const domWechat = $('#wechat');
+            const domBirthDate = $('#birthDate');
+            const domBirthTime = $('#birthTime');
+            const domBirthPlace = $('#birthPlace');
+
+            // ==================== 工具函数 ====================
+            function getMondayOfWeek(date) {
+                const d = new Date(date);
+                const day = d.getDay(); // 0=周日
+                const diff = day === 0 ? -6 : 1 - day;
+                d.setDate(d.getDate() + diff);
+                d.setHours(0, 0, 0, 0);
+                return d;
+            }
+
+            function getWeekDates(monday) {
+                const dates = [];
+                for (let i = 0; i < 7; i++) {
+                    const d = new Date(monday);
+                    d.setDate(d.getDate() + i);
+                    dates.push(d);
+                }
+                return dates;
+            }
+
+            function formatDateKey(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            function formatDateDisplay(date) {
+                const m = date.getMonth() + 1;
+                const d = date.getDate();
+                return `${m}月${d}日`;
+            }
+
+            function getStorageKey() {
+                const mondayKey = formatDateKey(currentWeekMonday);
+                return STORAGE_KEY_PREFIX + mondayKey;
+            }
+
+            function loadData() {
+                const key = getStorageKey();
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (raw) {
+                        return JSON.parse(raw);
+                    }
+                } catch (e) {
+                    console.warn('数据读取失败，将使用空数据', e);
+                }
+                return {};
+            }
+
+            function saveData(data) {
+                const key = getStorageKey();
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                } catch (e) {
+                    showToast('存储空间不足，请清理旧数据', 'error');
+                    console.error('数据保存失败', e);
+                }
+            }
+
+            function getSlotData(dateKey, slotId) {
+                const data = loadData();
+                if (!data[dateKey]) return null;
+                return data[dateKey][slotId] || null;
+            }
+
+            function setSlotData(dateKey, slotId, bookingInfo) {
+                const data = loadData();
+                if (!data[dateKey]) {
+                    data[dateKey] = {};
+                }
+                data[dateKey][slotId] = bookingInfo; // null表示释放，对象表示预约
+                saveData(data);
+            }
+
+            function isSlotExpired(date, slotStartHour) {
+                const now = new Date();
+                const slotDateTime = new Date(date);
+                slotDateTime.setHours(slotStartHour, 0, 0, 0);
+                return now >= slotDateTime;
+            }
+
+            function isToday(date) {
+                const now = new Date();
+                return date.getFullYear() === now.getFullYear() &&
+                    date.getMonth() === now.getMonth() &&
+                    date.getDate() === now.getDate();
+            }
+
+            // ==================== Toast ====================
+            function showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                domToastContainer.appendChild(toast);
+                const duration = type === 'error' ? 3000 : 2200;
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.35s ease';
+                    setTimeout(() => toast.remove(), 350);
+                }, duration);
+            }
+
+            // ==================== 渲染表格 ====================
+            function renderScheduleTable() {
+                const weekDates = getWeekDates(currentWeekMonday);
+                const data = loadData();
+                const todayStr = formatDateKey(new Date());
+
+                // 更新周标签
+                const startDisplay = formatDateDisplay(weekDates[0]);
+                const endDisplay = formatDateDisplay(weekDates[6]);
+                const year = weekDates[0].getFullYear();
+                domWeekLabel.textContent = `${year}年 · ${startDisplay} — ${endDisplay}`;
+
+                // 渲染表头
+                let headerHTML = '<th style="width:70px;min-width:55px;">时段</th>';
+                weekDates.forEach((d, i) => {
+                    const isTodayCol = formatDateKey(d) === todayStr;
+                    const cls = isTodayCol ? ' today-col' : '';
+                    headerHTML += `
+                        <th class="${cls}">
+                            <span class="date-num">${d.getDate()}</span>
+                            <span class="date-month">${d.getMonth()+1}月 · ${WEEKDAY_NAMES[d.getDay()]}</span>
+                        </th>`;
+                });
+                domTableHeaderRow.innerHTML = headerHTML;
+
+                // 渲染表体
+                let bodyHTML = '';
+                TIME_SLOTS.forEach(slot => {
+                    bodyHTML += '<tr>';
+                    bodyHTML += `
+                        <td class="time-label">
+                            ${slot.icon} ${slot.label}
+                            <span class="time-range">${slot.timeRange}</span>
+                        </td>`;
+                    weekDates.forEach(d => {
+                        const dateKey = formatDateKey(d);
+                        const slotData = data[dateKey] ? data[dateKey][slot.id] : null;
+                        const expired = isSlotExpired(d, slot.startHour);
+                        const booked = !!slotData;
+
+                        let cellClass = '';
+                        let cellIcon = '';
+                        let cellStatus = '';
+                        let cellAttrs = '';
+
+                        if (expired) {
+                            cellClass = 'expired';
+                            cellIcon = '⏰';
+                            cellStatus = '已过期';
+                        } else if (booked) {
+                            cellClass = 'booked';
+                            cellIcon = '🔒';
+                            cellStatus = '已预约';
+                        } else {
+                            cellClass = 'free';
+                            cellIcon = '✨';
+                            cellStatus = '点击预约';
+                            cellAttrs = `data-date-key="${dateKey}" data-slot-id="${slot.id}"`;
+                        }
+
+                        bodyHTML += `
+                            <td class="slot-cell ${cellClass}" ${cellAttrs}>
+                                <span class="slot-icon">${cellIcon}</span>
+                                <span class="slot-status">${cellStatus}</span>
+                            </td>`;
+                    });
+                    bodyHTML += '</tr>';
+                });
+
+                // 更新tbody
+                const tbody = domScheduleTable.querySelector('tbody');
+                if (tbody) {
+                    tbody.innerHTML = bodyHTML;
+                } else {
+                    const newTbody = document.createElement('tbody');
+                    newTbody.innerHTML = bodyHTML;
+                    domScheduleTable.appendChild(newTbody);
+                }
+
+                // 绑定点击事件
+                bindSlotClickEvents();
+            }
+
+            function bindSlotClickEvents() {
+                const freeCells = domScheduleTable.querySelectorAll('td.slot-cell.free[data-date-key][data-slot-id]');
+                freeCells.forEach(cell => {
+                    cell.addEventListener('click', function() {
+                        const dateKey = this.getAttribute('data-date-key');
+                        const slotId = this.getAttribute('data-slot-id');
+                        openBookingModal(dateKey, slotId);
+                    });
+                });
+
+                // 已预约的单元格：点击提示（不显示客户信息）
+                const bookedCells = domScheduleTable.querySelectorAll('td.slot-cell.booked');
+                bookedCells.forEach(cell => {
+                    cell.addEventListener('click', function() {
+                        showToast('该时段已被预约，请选择其他空闲时段', 'info');
+                    });
+                });
+            }
+
+            // ==================== 预约模态框 ====================
+            function openBookingModal(dateKey, slotId) {
+                // 再次检查是否仍然空闲
+                const existing = getSlotData(dateKey, slotId);
+                if (existing) {
+                    showToast('抱歉，该时段刚刚被其他人预约了，请刷新后重选', 'error');
+                    renderScheduleTable();
+                    return;
+                }
+                // 检查是否过期
+                const [y, m, d] = dateKey.split('-').map(Number);
+                const dateObj = new Date(y, m - 1, d);
+                const slot = TIME_SLOTS.find(s => s.id === slotId);
+                if (slot && isSlotExpired(dateObj, slot.startHour)) {
+                    showToast('该时段已过期，无法预约', 'error');
+                    renderScheduleTable();
+                    return;
+                }
+
+                selectedSlotKey = dateKey + '|' + slotId;
+                const slotInfo = TIME_SLOTS.find(s => s.id === slotId);
+                const weekDay = WEEKDAY_NAMES[dateObj.getDay()];
+                const dateDisplay = formatDateDisplay(dateObj);
+                domSelectedSlotInfo.textContent =
+                    `📅 ${dateDisplay} ${weekDay} · ${slotInfo ? slotInfo.icon + ' ' + slotInfo.label + ' ' + slotInfo.timeRange : slotId}`;
+
+                // 清空表单
+                domBookingForm.reset();
+                domWechat.value = '';
+                domBirthDate.value = '';
+                domBirthTime.value = '';
+                domBirthPlace.value = '';
+                const radioButtons = domBookingForm.querySelectorAll('input[name="online"]');
+                radioButtons.forEach(r => r.checked = false);
+
+                domModalOverlay.style.display = 'flex';
+                setTimeout(() => {
+                    domWechat.focus();
+                }, 300);
+            }
+
+            function closeBookingModal() {
+                domModalOverlay.style.display = 'none';
+                selectedSlotKey = null;
+                domBookingForm.reset();
+            }
+
+            function handleBookingSubmit(e) {
+                e.preventDefault();
+
+                if (!selectedSlotKey) {
+                    showToast('请先选择一个时段', 'error');
+                    return;
+                }
+
+                const [dateKey, slotId] = selectedSlotKey.split('|');
+
+                // 再次校验时段是否仍空闲
+                const existing = getSlotData(dateKey, slotId);
+                if (existing) {
+                    showToast('该时段已被预约，请重新选择', 'error');
+                    closeBookingModal();
+                    renderScheduleTable();
+                    return;
+                }
+
+                // 校验过期
+                const [y, m, d] = dateKey.split('-').map(Number);
+                const dateObj = new Date(y, m - 1, d);
+                const slot = TIME_SLOTS.find(s => s.id === slotId);
+                if (slot && isSlotExpired(dateObj, slot.startHour)) {
+                    showToast('该时段已过期，无法预约', 'error');
+                    closeBookingModal();
+                    renderScheduleTable();
+                    return;
+                }
+
+                // 收集表单数据
+                const wechat = domWechat.value.trim();
+                const birthDate = domBirthDate.value;
+                const birthTime = domBirthTime.value;
+                const birthPlace = domBirthPlace.value.trim();
+                const onlineRadio = domBookingForm.querySelector('input[name="online"]:checked');
+                const online = onlineRadio ? onlineRadio.value : null;
+
+                // 验证
+                if (!wechat) { showToast('请填写微信号', 'error');
+                    domWechat.focus(); return; }
+                if (!birthDate) { showToast('请选择出生日期', 'error');
+                    domBirthDate.focus(); return; }
+                if (!birthTime) { showToast('请选择出生时间', 'error');
+                    domBirthTime.focus(); return; }
+                if (!birthPlace) { showToast('请填写出生地点（精确到市）', 'error');
+                    domBirthPlace.focus(); return; }
+                if (!online) { showToast('请选择线上还是线下', 'error'); return; }
+
+                // 构建预约信息
+                const bookingInfo = {
+                    wechat,
+                    birthDate,
+                    birthTime,
+                    birthPlace,
+                    online,
+                    timestamp: new Date().toISOString(),
+                };
+
+                // 保存
+                setSlotData(dateKey, slotId, bookingInfo);
+
+                // 关闭模态框
+                closeBookingModal();
+
+                // 刷新表格
+                renderScheduleTable();
+
+                // 成功提示
+                const slotInfo = TIME_SLOTS.find(s => s.id === slotId);
+                const weekDay = WEEKDAY_NAMES[dateObj.getDay()];
+                showToast(`✅ 预约成功！${formatDateDisplay(dateObj)} ${weekDay} ${slotInfo ? slotInfo.label : ''} ${slotInfo ? slotInfo.timeRange : ''}`,
+                    'success');
+
+                // 如果管理面板开着，刷新管理数据
+                if (isAdminLoggedIn && domAdminContent.style.display !== 'none') {
+                    renderAdminTable();
+                }
+            }
+
+            // ==================== 管理面板 ====================
+            function openAdminPanel() {
+                domAdminPanel.style.display = 'block';
+                domAdminContent.style.display = 'none';
+                domAdminPasswordInput.value = '';
+                isAdminLoggedIn = false;
+                domAdminPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                    domAdminPasswordInput.focus();
+                }, 400);
+            }
+
+            function closeAdminPanel() {
+                domAdminPanel.style.display = 'none';
+                domAdminContent.style.display = 'none';
+                domAdminPasswordInput.value = '';
+                isAdminLoggedIn = false;
+            }
+
+            function handleAdminLogin() {
+                const input = domAdminPasswordInput.value.trim();
+                if (input === ADMIN_PASSWORD) {
+                    isAdminLoggedIn = true;
+                    domAdminContent.style.display = 'block';
+                    domAdminPasswordInput.value = '';
+                    renderAdminTable();
+                    showToast('🔓 验证成功，欢迎管理员', 'success');
+                } else {
+                    showToast('密码错误，请重试', 'error');
+                    domAdminPasswordInput.value = '';
+                    domAdminPasswordInput.focus();
+                }
+            }
+
+            function renderAdminTable() {
+                const data = loadData();
+                const weekDates = getWeekDates(currentWeekMonday);
+                const rows = [];
+
+                weekDates.forEach(d => {
+                    const dateKey = formatDateKey(d);
+                    const weekDay = WEEKDAY_NAMES[d.getDay()];
+                    const dateDisplay = formatDateDisplay(d);
+                    TIME_SLOTS.forEach(slot => {
+                        const slotData = data[dateKey] ? data[dateKey][slot.id] : null;
+                        if (slotData) {
+                            rows.push({
+                                dateKey,
+                                dateDisplay,
+                                weekDay,
+                                slotLabel: slot.label,
+                                slotTimeRange: slot.timeRange,
+                                slotIcon: slot.icon,
+                                ...slotData,
+                            });
+                        }
+                    });
+                });
+
+                domAdminTableBody.innerHTML = rows.length === 0 ?
+                    '<tr><td colspan="9" style="padding:30px;color:#b0b0b0;">暂无预约记录</td></tr>' :
+                    rows.map((r, idx) => `
+                        <tr>
+                            <td>${r.dateDisplay}</td>
+                            <td>${r.weekDay}</td>
+                            <td>${r.slotIcon} ${r.slotLabel}<br><small style="color:#888;">${r.slotTimeRange}</small></td>
+                            <td>${escapeHTML(r.wechat)}</td>
+                            <td>${r.birthDate}</td>
+                            <td>${r.birthTime}</td>
+                            <td>${escapeHTML(r.birthPlace)}</td>
+                            <td>${r.online === '线上' ? '🌐 线上' : '🏠 线下'}</td>
+                            <td><button class="delete-btn" data-date-key="${r.dateKey}" data-slot-id="${
+                                TIME_SLOTS.find(s=>s.label===r.slotLabel)?.id || ''
+                            }">取消预约</button></td>
+                        </tr>
+                    `).join('');
+
+                domAdminTotalCount.textContent = rows.length;
+
+                // 绑定删除按钮
+                domAdminTableBody.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const dk = this.getAttribute('data-date-key');
+                        const sid = this.getAttribute('data-slot-id');
+                        if (dk && sid) {
+                            handleDeleteBooking(dk, sid);
+                        }
+                    });
+                });
+            }
+
+            function handleDeleteBooking(dateKey, slotId) {
+                if (!isAdminLoggedIn) return;
+                const slotData = getSlotData(dateKey, slotId);
+                if (!slotData) {
+                    showToast('该时段无预约记录', 'info');
+                    return;
+                }
+                const confirmMsg = `确定要取消以下预约吗？\n\n时段：${dateKey} ${slotId}\n微信号：${slotData.wechat}\n\n此操作不可恢复。`;
+                if (confirm(confirmMsg)) {
+                    setSlotData(dateKey, slotId, null);
+                    renderScheduleTable();
+                    renderAdminTable();
+                    showToast('已取消该预约，时段已释放', 'success');
+                }
+            }
+
+            function exportCSV() {
+                const data = loadData();
+                const weekDates = getWeekDates(currentWeekMonday);
+                const rows = [];
+
+                weekDates.forEach(d => {
+                    const dateKey = formatDateKey(d);
+                    const weekDay = WEEKDAY_NAMES[d.getDay()];
+                    const dateDisplay = formatDateDisplay(d);
+                    TIME_SLOTS.forEach(slot => {
+                        const slotData = data[dateKey] ? data[dateKey][slot.id] : null;
+                        if (slotData) {
+                            rows.push({
+                                日期: dateDisplay,
+                                星期: weekDay,
+                                时段: slot.label + ' ' + slot.timeRange,
+                                微信号: slotData.wechat,
+                                出生日期: slotData.birthDate,
+                                出生时间: slotData.birthTime,
+                                出生地点: slotData.birthPlace,
+                                线上或线下: slotData.online,
+                                预约时间戳: slotData.timestamp || '',
+                            });
+                        }
+                    });
+                });
+
+                if (rows.length === 0) {
+                    showToast('暂无预约记录可导出', 'info');
+                    return;
+                }
+
+                // 构建CSV
+                const headers = ['日期', '星期', '时段', '微信号', '出生日期', '出生时间', '出生地点', '线上或线下', '预约时间戳'];
+                const csvContent = '\uFEFF' + headers.join(',') + '\n' +
+                    rows.map(r =>
+                        headers.map(h => {
+                            let val = (r[h] || '').replace(/"/g, '""');
+                            return `"${val}"`;
+                        }).join(',')
+                    ).join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const mondayKey = formatDateKey(currentWeekMonday);
+                link.download = `预约排班_${mondayKey}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showToast(`📥 已导出 ${rows.length} 条记录`, 'success');
+            }
+
+            function escapeHTML(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ==================== 事件绑定 ====================
+            // 模态框关闭
+            domModalOverlay.addEventListener('click', function(e) {
+                if (e.target === domModalOverlay) {
+                    closeBookingModal();
+                }
+            });
+            $('#btnCancelBooking').addEventListener('click', closeBookingModal);
+
+            // 表单提交
+            domBookingForm.addEventListener('submit', handleBookingSubmit);
+
+            // 周次导航
+            $('#btnPrevWeek').addEventListener('click', () => {
+                currentWeekMonday.setDate(currentWeekMonday.getDate() - 7);
+                renderScheduleTable();
+                if (isAdminLoggedIn && domAdminContent.style.display !== 'none') {
+                    renderAdminTable();
+                }
+            });
+            $('#btnNextWeek').addEventListener('click', () => {
+                currentWeekMonday.setDate(currentWeekMonday.getDate() + 7);
+                renderScheduleTable();
+                if (isAdminLoggedIn && domAdminContent.style.display !== 'none') {
+                    renderAdminTable();
+                }
+            });
+            $('#btnToday').addEventListener('click', () => {
+                currentWeekMonday = getMondayOfWeek(new Date());
+                renderScheduleTable();
+                if (isAdminLoggedIn && domAdminContent.style.display !== 'none') {
+                    renderAdminTable();
+                }
+                showToast('已回到本周', 'info');
+            });
+
+            // 管理面板
+            $('#btnAdminTrigger').addEventListener('click', openAdminPanel);
+            $('#btnAdminClose').addEventListener('click', closeAdminPanel);
+            $('#btnAdminLogin').addEventListener('click', handleAdminLogin);
+            domAdminPasswordInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    handleAdminLogin();
+                }
+            });
+            $('#btnExportCSV').addEventListener('click', exportCSV);
+            $('#btnRefreshAdmin').addEventListener('click', () => {
+                if (isAdminLoggedIn) {
+                    renderAdminTable();
+                    renderScheduleTable();
+                    showToast('数据已刷新', 'info');
+                }
+            });
+
+            // 键盘关闭模态框
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    if (domModalOverlay.style.display === 'flex') {
+                        closeBookingModal();
+                    }
+                    if (domAdminPanel.style.display === 'block' && !isAdminLoggedIn) {
+                        closeAdminPanel();
+                    }
+                }
+            });
+
+            // ==================== 初始化 ====================
+            function init() {
+                renderScheduleTable();
+                // 默认关闭管理面板
+                domAdminPanel.style.display = 'none';
+                domAdminContent.style.display = 'none';
+                domModalOverlay.style.display = 'none';
+            }
+
+            init();
+            console.log('✅ 时段预约排班表已就绪');
+            console.log('   📅 当前周:', formatDateKey(currentWeekMonday));
+            console.log('   🔐 管理员密码:', ADMIN_PASSWORD);
+            console.log('   💾 数据存储键:', getStorageKey());
+            console.log('   💡 点击绿色空闲时段即可预约');
+            console.log('   🔒 点击底部"管理员查看"可管理预约');
+        })();
+    </script>
+</body>
+</html>
