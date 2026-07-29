@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📅 时段预约排班表（共享版）</title>
+  <style>
+    /* 样式完全沿用你原来的设计，为节省篇幅这里省略，实际使用请复制你之前完整的CSS */
+    /* 你可以在本地把下面完整代码保存后查看效果 */
+    :root{--bg:#fdf8f3;--card-bg:#fff;--primary:#8b5e3c;--accent:#d4a574;--text:#3e2f22;--border:#e0d5c7;--free-bg:#f0faf5;--free-border:#8cc9a8;--free-text:#3d7a5c;--booked-bg:#fff5f0;--booked-border:#e8b89d;--booked-text:#c0784a;--expired-bg:#f5f5f5;--expired-border:#d5d5d5;--expired-text:#b0b0b0}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);min-height:100vh;color:var(--text);display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px;line-height:1.6}
+    .main-container{width:100%;max-width:960px;display:flex;flex-direction:column;gap:24px}
+    .header{text-align:center;padding:10px 0 6px}
+    .header h1{font-size:1.85rem;color:var(--primary)}
+    .notice-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px 20px;font-size:0.92rem;color:#6b5d4f;display:flex;gap:10px}
+    .week-nav{display:flex;align-items:center;justify-content:center;gap:16px}
+    .week-nav button{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:1.1rem}
+    .week-label{font-weight:700;color:var(--primary);min-width:180px;text-align:center;background:var(--card-bg);padding:8px 16px;border-radius:20px;border:1px solid var(--border)}
+    .table-wrapper{background:var(--card-bg);border-radius:20px;padding:20px 16px 24px;box-shadow:0 4px 16px rgba(62,47,34,0.1);border:1px solid var(--border);overflow-x:auto}
+    .schedule-table{width:100%;border-collapse:collapse;min-width:700px}
+    .schedule-table th,.schedule-table td{text-align:center;padding:10px 6px;font-size:0.88rem}
+    .schedule-table thead th{background:#faf7f2;color:var(--primary);font-weight:700;border-bottom:2px solid var(--accent)}
+    .time-label{font-weight:700;color:var(--primary);background:#fdfaf6}
+    .slot-cell{cursor:pointer;border-radius:8px;transition:0.2s;border:2px solid transparent}
+    .slot-cell.free{background:var(--free-bg);border-color:var(--free-border);color:var(--free-text)}
+    .slot-cell.free:hover{background:#d9f3e4;transform:translateY(-2px)}
+    .slot-cell.booked{background:var(--booked-bg);border-color:var(--booked-border);color:var(--booked-text);cursor:default}
+    .slot-cell.expired{background:var(--expired-bg);border-color:var(--expired-border);color:var(--expired-text);cursor:not-allowed}
+    .modal-overlay{position:fixed;inset:0;background:rgba(40,25,15,0.55);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+    .modal-card{background:#fff;border-radius:20px;padding:28px 26px;width:100%;max-width:480px;box-shadow:0 12px 32px rgba(62,47,34,0.2)}
+    /* 其余样式与原版相同，此处省略以节省篇幅 */
+    .btn-primary{background:var(--primary);color:#fff;border:none;padding:12px 20px;border-radius:25px;cursor:pointer}
+    .btn-cancel{background:#fff;color:var(--text);border:2px solid var(--border);padding:12px 20px;border-radius:25px;cursor:pointer}
+    .admin-panel{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 16px rgba(62,47,34,0.1);margin-top:8px}
+    .toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:200;padding:12px 24px;border-radius:25px;font-weight:700;box-shadow:0 12px 32px rgba(0,0,0,0.15)}
+    .toast.success{background:#e8f5e9;color:#2e6b3a}
+    .toast.error{background:#fef0ed;color:#a04030}
+    .toast.info{background:#fff8e8;color:#8b6d30}
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <div class="header">
+      <h1>📅 时段预约排班表</h1>
+      <p style="color:#6b5d4f;">请选择您方便的时间段进行预约（数据实时共享）</p>
+    </div>
+    <div class="notice-card">
+      <span>💡</span>
+      <div><strong>说明：</strong>您好哇，为了避免出现遗漏和重复排列的问题，我设计了本表单供大家选择时间。<br>每个时段<strong>仅限一人</strong>，点击绿色空闲时段填写信息即可预约。</div>
+    </div>
+    <div class="week-nav">
+      <button id="btnPrevWeek">◀</button>
+      <span class="week-label" id="weekLabel">--</span>
+      <button id="btnNextWeek">▶</button>
+      <button id="btnToday" style="border-radius:20px;padding:0 16px;font-size:0.85rem;">📌 本周</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="schedule-table" id="scheduleTable">
+        <thead><tr id="tableHeaderRow"></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div style="text-align:center;">
+      <button id="btnAdminTrigger" style="background:transparent;border:1.5px dashed #d5c7b0;padding:10px 22px;border-radius:25px;">🔒 管理员查看</button>
+    </div>
+    <div class="admin-panel" id="adminPanel" style="display:none;">
+      <h3>🔐 管理员面板</h3>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:14px;">
+        <input type="password" id="adminPasswordInput" placeholder="管理密码" style="padding:10px;border-radius:20px;border:2px solid #ddd;">
+        <button id="btnAdminLogin" class="btn-primary" style="padding:10px 18px;border-radius:20px;">验证</button>
+        <button id="btnAdminClose" class="btn-cancel" style="padding:10px 18px;border-radius:20px;">关闭</button>
+      </div>
+      <div id="adminContent" style="display:none;">
+        <button id="btnExportCSV" class="btn-primary">📥 导出CSV</button>
+        <table id="adminTable" style="width:100%;margin-top:12px;border-collapse:collapse;"><thead><tr><th>日期</th><th>时段</th><th>微信号</th><th>出生</th><th>地点</th><th>线上/线下</th><th>操作</th></tr></thead><tbody id="adminTableBody"></tbody></table>
+        <p style="text-align:center;">共 <strong id="adminTotalCount">0</strong> 条记录</p>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-card">
+      <h3>✍️ 填写预约信息</h3>
+      <div id="selectedSlotInfo" style="text-align:center;margin-bottom:18px;font-weight:700;color:#d4a574;"></div>
+      <form id="bookingForm">
+        <div><label>微信号 *</label><input type="text" id="wechat" required></div>
+        <div><label>出生日期 *</label><input type="date" id="birthDate" required></div>
+        <div><label>出生时间 *</label><input type="time" id="birthTime" required></div>
+        <div><label>出生地点 *</label><input type="text" id="birthPlace" required></div>
+        <div><label>线上/线下 *</label><label><input type="radio" name="online" value="线上" required> 线上</label><label><input type="radio" name="online" value="线下"> 线下</label></div>
+        <div style="display:flex;gap:12px;margin-top:20px;">
+          <button type="button" id="btnCancelBooking" class="btn-cancel">取消</button>
+          <button type="submit" class="btn-primary">✅ 确认预约</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="toastContainer"></div>
+
+  <script>
+    (function() {
+      // ========== 配置：替换成你自己的JSONBin信息 ==========
+      const JSONBIN_BIN_ID = '你的BIN_ID';          // 例如 '64abc123...'
+      const JSONBIN_API_KEY = '你的ACCESS_KEY';     // 在 jsonbin.io 的 API Keys 页面获取
+      const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+      const ADMIN_PASSWORD = 'admin888';           // 管理员密码，可自行修改
+
+      // ========== 其他常量 ==========
+      const TIME_SLOTS = [
+        { id: 'morning', label: '上午', timeRange: '9:00-12:00', startHour: 9, icon: '☀️' },
+        { id: 'afternoon', label: '下午', timeRange: '15:00-18:00', startHour: 15, icon: '🌤️' },
+        { id: 'evening', label: '晚上', timeRange: '19:00-22:00', startHour: 19, icon: '🌙' },
+      ];
+      const WEEKDAY_NAMES = ['周日','周一','周二','周三','周四','周五','周六'];
+      let currentWeekMonday = getMondayOfWeek(new Date());
+      let selectedSlotKey = null;
+      let isAdminLoggedIn = false;
+      let localCache = {}; // 缓存从JSONBin拉取的最新数据
+
+      function getMondayOfWeek(d){const r=new Date(d);r.setHours(0,0,0,0);const day=r.getDay();const diff=day===0?-6:1-day;r.setDate(r.getDate()+diff);return r;}
+      function formatDateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+      function formatDateDisplay(d){return `${d.getMonth()+1}月${d.getDate()}日`}
+      function isSlotExpired(date,startHour){return new Date() >= new Date(date.getFullYear(),date.getMonth(),date.getDate(),startHour,0,0);}
+
+      // ========== 与JSONBin交互 ==========
+      async function fetchRemoteData(){
+        const resp = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': JSONBIN_API_KEY } });
+        if(!resp.ok) throw new Error('数据读取失败');
+        const json = await resp.json();
+        localCache = json.record;
+        return localCache;
+      }
+
+      async function updateRemoteData(newData){
+        const resp = await fetch(JSONBIN_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+          body: JSON.stringify(newData)
+        });
+        if(!resp.ok) throw new Error('数据更新失败');
+        localCache = newData;
+      }
+
+      function getSlotData(dateKey, slotId){ return localCache[dateKey]?.[slotId] || null; }
+      async function bookSlot(dateKey, slotId, bookingInfo){
+        // 再次拉取最新数据，避免覆盖他人写入
+        await fetchRemoteData();
+        if(getSlotData(dateKey, slotId)) throw new Error('时段已被占用');
+        if(!localCache[dateKey]) localCache[dateKey] = {};
+        localCache[dateKey][slotId] = bookingInfo;
+        await updateRemoteData(localCache);
+      }
+      async function deleteSlot(dateKey, slotId){
+        await fetchRemoteData();
+        if(localCache[dateKey] && localCache[dateKey][slotId]){
+          delete localCache[dateKey][slotId];
+          if(Object.keys(localCache[dateKey]).length===0) delete localCache[dateKey];
+          await updateRemoteData(localCache);
+        }
+      }
+
+      // ========== 渲染 ==========
+      function renderScheduleTable(){
+        const weekDates = getWeekDates(currentWeekMonday);
+        const startDisp = formatDateDisplay(weekDates[0]), endDisp = formatDateDisplay(weekDates[6]);
+        document.getElementById('weekLabel').textContent = `${weekDates[0].getFullYear()}年 · ${startDisp} — ${endDisp}`;
+        let headerHTML = '<th>时段</th>';
+        weekDates.forEach(d=>{headerHTML+=`<th>${d.getDate()}<br><small>${d.getMonth()+1}月 ${WEEKDAY_NAMES[d.getDay()]}</small></th>`;});
+        document.getElementById('tableHeaderRow').innerHTML = headerHTML;
+        let bodyHTML='';
+        TIME_SLOTS.forEach(slot=>{
+          bodyHTML+='<tr><td class="time-label">'+slot.icon+' '+slot.label+'<br><small>'+slot.timeRange+'</small></td>';
+          weekDates.forEach(d=>{
+            const dk=formatDateKey(d);
+            const data=getSlotData(dk,slot.id);
+            const expired=isSlotExpired(d,slot.startHour);
+            let cls='',icon='',text='';
+            if(expired){cls='expired';icon='⏰';text='已过期';}
+            else if(data){cls='booked';icon='🔒';text='已预约';}
+            else{cls='free';icon='✨';text='点击预约';}
+            bodyHTML+=`<td class="slot-cell ${cls}" ${cls==='free'?`data-date-key="${dk}" data-slot-id="${slot.id}"`:''}>${icon} ${text}</td>`;
+          });
+          bodyHTML+='</tr>';
+        });
+        document.querySelector('#scheduleTable tbody').innerHTML = bodyHTML;
+        document.querySelectorAll('.slot-cell.free').forEach(cell=>cell.addEventListener('click',()=>openBookingModal(cell.dataset.dateKey, cell.dataset.slotId)));
+      }
+
+      function getWeekDates(monday){const arr=[];for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(d.getDate()+i);arr.push(d);}return arr;}
+
+      function openBookingModal(dk,sid){
+        if(getSlotData(dk,sid)){showToast('时段已被预约','error');renderScheduleTable();return;}
+        const [y,m,d]=dk.split('-');const date=new Date(y,m-1,d);
+        const slot=TIME_SLOTS.find(s=>s.id===sid);
+        if(slot&&isSlotExpired(date,slot.startHour)){showToast('已过期','error');return;}
+        selectedSlotKey=dk+'|'+sid;
+        document.getElementById('selectedSlotInfo').textContent=`📅 ${formatDateDisplay(date)} ${WEEKDAY_NAMES[date.getDay()]} · ${slot.icon} ${slot.label} ${slot.timeRange}`;
+        document.getElementById('modalOverlay').style.display='flex';
+      }
+
+      document.getElementById('btnCancelBooking').addEventListener('click',()=>{document.getElementById('modalOverlay').style.display='none';selectedSlotKey=null;});
+      document.getElementById('bookingForm').addEventListener('submit', async function(e){
+        e.preventDefault();
+        if(!selectedSlotKey) return;
+        const [dk,sid]=selectedSlotKey.split('|');
+        const wechat=document.getElementById('wechat').value.trim();
+        const birthDate=document.getElementById('birthDate').value;
+        const birthTime=document.getElementById('birthTime').value;
+        const birthPlace=document.getElementById('birthPlace').value.trim();
+        const online=document.querySelector('input[name="online"]:checked')?.value;
+        if(!wechat||!birthDate||!birthTime||!birthPlace||!online){showToast('请填写完整信息','error');return;}
+        try{
+          await bookSlot(dk,sid,{wechat,birthDate,birthTime,birthPlace,online,timestamp:new Date().toISOString()});
+          document.getElementById('modalOverlay').style.display='none';
+          selectedSlotKey=null;
+          renderScheduleTable();
+          showToast('预约成功！','success');
+        }catch(err){showToast(err.message,'error');}
+      });
+
+      // 管理面板
+      document.getElementById('btnAdminTrigger').addEventListener('click',()=>{document.getElementById('adminPanel').style.display='block';});
+      document.getElementById('btnAdminClose').addEventListener('click',()=>{document.getElementById('adminPanel').style.display='none';});
+      document.getElementById('btnAdminLogin').addEventListener('click',()=>{
+        if(document.getElementById('adminPasswordInput').value===ADMIN_PASSWORD){
+          isAdminLoggedIn=true;document.getElementById('adminContent').style.display='block';
+          renderAdminTable();
+        }else{showToast('密码错误','error');}
+      });
+      function renderAdminTable(){
+        const rows=[];
+        getWeekDates(currentWeekMonday).forEach(d=>{
+          const dk=formatDateKey(d);
+          TIME_SLOTS.forEach(slot=>{
+            const data=getSlotData(dk,slot.id);
+            if(data) rows.push({date:formatDateDisplay(d),week:WEEKDAY_NAMES[d.getDay()],slot:slot.label+' '+slot.timeRange,...data,dk,slotId:slot.id});
+          });
+        });
+        const tbody=document.getElementById('adminTableBody');
+        tbody.innerHTML=rows.length?rows.map(r=>`<tr><td>${r.date} ${r.week}</td><td>${r.slot}</td><td>${r.wechat}</td><td>${r.birthDate} ${r.birthTime}</td><td>${r.birthPlace}</td><td>${r.online}</td><td><button class="btn-cancel" data-dk="${r.dk}" data-sid="${r.slotId}">取消</button></td></tr>`).join(''):'<tr><td colspan="7">暂无记录</td></tr>';
+        document.getElementById('adminTotalCount').textContent=rows.length;
+        tbody.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',async ()=>{
+          if(confirm('确定取消该预约？')){await deleteSlot(btn.dataset.dk,btn.dataset.sid);renderScheduleTable();renderAdminTable();}
+        }));
+      }
+      document.getElementById('btnExportCSV').addEventListener('click',()=>{
+        const rows=[];getWeekDates(currentWeekMonday).forEach(d=>{const dk=formatDateKey(d);TIME_SLOTS.forEach(s=>{const data=getSlotData(dk,s.id);if(data)rows.push({日期:formatDateDisplay(d),星期:WEEKDAY_NAMES[d.getDay()],时段:s.label+' '+s.timeRange,微信号:data.wechat,出生:data.birthDate+' '+data.birthTime,地点:data.birthPlace,方式:data.online});})});
+        if(rows.length===0) return showToast('无数据','info');
+        const csv='\uFEFF'+Object.keys(rows[0]).join(',')+'\n'+rows.map(r=>Object.values(r).map(v=>`"${v}"`).join(',')).join('\n');
+        const blob=new Blob([csv],{type:'text/csv'});
+        const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='预约导出.csv';a.click();
+      });
+
+      function showToast(msg,type){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toastContainer').appendChild(t);setTimeout(()=>t.remove(),2000);}
+
+      // 初始化：拉取远程数据再渲染
+      async function init(){
+        try{
+          await fetchRemoteData();
+        }catch(e){
+          showToast('加载数据失败，将使用空白表格','error');
+          localCache={};
+        }
+        renderScheduleTable();
+        document.getElementById('btnPrevWeek').addEventListener('click',()=>{currentWeekMonday.setDate(currentWeekMonday.getDate()-7);renderScheduleTable();});
+        document.getElementById('btnNextWeek').addEventListener('click',()=>{currentWeekMonday.setDate(currentWeekMonday.getDate()+7);renderScheduleTable();});
+        document.getElementById('btnToday').addEventListener('click',()=>{currentWeekMonday=getMondayOfWeek(new Date());renderScheduleTable();});
+      }
+      init();
+    })();
+  </script>
+</body>
+</html>
